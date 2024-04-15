@@ -1,0 +1,123 @@
+// datasource db defines the database connection settings.
+// It is configured for PostgreSQL and uses an environment variable for the connection URL.
+// The 'extensions' feature enables the use of PostgreSQL-specific data types.
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+}
+
+// generator db configures Prisma Client settings.
+// It is set up to use Prisma Client Python with asyncio interface and specific features.
+generator db {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = 5
+  previewFeatures      = ["postgresqlExtensions"]
+}
+
+model User {
+  id             String         @id @default(dbgenerated("gen_random_uuid()"))
+  email          String         @unique
+  hashedPassword String
+  role           UserRole       @default(USER)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  apiKeys        ApiKey[]
+  QRCodes        QRCode[]
+  subscriptions  Subscription[]
+  usageStats     UsageStats[]
+}
+
+model QRCode {
+  id              String        @id @default(dbgenerated("gen_random_uuid()"))
+  content         String
+  QRType          QRType
+  customizationId String        @unique
+  customization   Customization @relation(fields: [customizationId], references: [id])
+  format          Format
+  createdAt       DateTime      @default(now())
+  userId          String
+  createdBy       User          @relation(fields: [userId], references: [id])
+}
+
+model Customization {
+  id                   String               @id @default(dbgenerated("gen_random_uuid()"))
+  size                 Int // Size in pixels for square QR codes
+  color                String // Hex code for foreground color
+  backgroundColor      String? // Hex code for background color, optional
+  errorCorrectionLevel ErrorCorrectionLevel
+  QRCode               QRCode?
+}
+
+model ApiKey {
+  id        String   @id @default(dbgenerated("gen_random_uuid()"))
+  key       String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Subscription {
+  id               String             @id @default(dbgenerated("gen_random_uuid()"))
+  userId           String
+  user             User               @relation(fields: [userId], references: [id])
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  status           SubscriptionStatus
+  subscriptionType SubscriptionType
+}
+
+model UsageStats {
+  id                String   @id @default(dbgenerated("gen_random_uuid()"))
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  createdAt         DateTime @default(now())
+  qrCodeGenerations Int
+  apiCalls          Int
+}
+
+model AuditLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()"))
+  action      String
+  description String?
+  performedBy String
+  createdAt   DateTime @default(now())
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  PREMIUM
+}
+
+enum QRType {
+  URL
+  TEXT
+  CONTACT
+}
+
+enum ErrorCorrectionLevel {
+  LOW
+  MEDIUM
+  QUARTILE
+  HIGH
+}
+
+enum Format {
+  SVG
+  PNG
+  JPEG
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  CANCELLED
+}
+
+enum SubscriptionType {
+  MONTHLY
+  YEARLY
+}
+
